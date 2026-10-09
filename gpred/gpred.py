@@ -84,7 +84,12 @@ def find_start(start_regex: Pattern, sequence: str, start: int, stop: int) -> Un
     :param stop: (int) Stop position of the research
     :return: (int) If exist, position of the start codon. Otherwise None. 
     """
-    pass
+    match = start_regex.search(sequence, start, stop)
+
+    if match:
+        return match.start(0)
+
+    return None
 
 
 def find_stop(stop_regex: Pattern, sequence: str, start: int) -> Union[int, None]:
@@ -95,7 +100,17 @@ def find_stop(stop_regex: Pattern, sequence: str, start: int) -> Union[int, None
     :param start: (int) Start position of the research
     :return: (int) If exist, position of the stop codon. Otherwise None. 
     """
-    pass
+    position = start + 3
+
+    while position <= len(sequence) - 3:
+        match = stop_regex.search(sequence, position, position + 3)
+
+        if match:
+            return match.start(0)
+
+        position += 3
+
+    return None
 
 
 def has_shine_dalgarno(shine_regex: Pattern, sequence: str, start: int, max_shine_dalgarno_distance: int) -> bool:
@@ -107,7 +122,20 @@ def has_shine_dalgarno(shine_regex: Pattern, sequence: str, start: int, max_shin
     :param max_shine_dalgarno_distance: (int) Maximum distance of the shine dalgarno to the start position
     :return: (boolean) true -> has a shine dalgarno upstream to the gene, false -> no
     """
-    pass
+    search_start = start - max_shine_dalgarno_distance
+    search_stop = start - 6
+
+    # Return False if the search starts before the genome
+    if search_start < 0:
+        return False
+
+    # Check the region upstream of the start codon
+    if search_start >= search_stop:
+        return False
+
+    match = shine_regex.search(sequence, search_start, search_stop)
+
+    return match is not None
 
 
 def predict_genes(sequence: str, start_regex: Pattern, stop_regex: Pattern, shine_regex: Pattern, 
