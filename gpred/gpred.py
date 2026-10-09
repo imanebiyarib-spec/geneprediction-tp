@@ -3,7 +3,7 @@ import sys
 import os
 import csv
 import re
-import textwrap
+from textwrap import fill
 from re import Pattern
 from pathlib import Path
 from typing import List, Union, Optional
@@ -125,11 +125,9 @@ def has_shine_dalgarno(shine_regex: Pattern, sequence: str, start: int, max_shin
     search_start = start - max_shine_dalgarno_distance
     search_stop = start - 6
 
-    # Return False if the search starts before the genome
     if search_start < 0:
         return False
 
-    # Check the region upstream of the start codon
     if search_start >= search_stop:
         return False
 
@@ -151,7 +149,42 @@ def predict_genes(sequence: str, start_regex: Pattern, stop_regex: Pattern, shin
     :param min_gap: (int) Minimum distance between two genes.
     :return: (list) List of [start, stop] position of each predicted genes.
     """
-    pass
+    genes = []
+    current_position = 0
+
+    while len(sequence) - current_position >= min_gap:
+        start_position = find_start(
+            start_regex, sequence, current_position, len(sequence)
+        )
+
+        if start_position is not None:
+            stop_position = find_stop(stop_regex, sequence, start_position)
+
+            if stop_position is not None:
+                gene_length = stop_position + 3 - start_position
+
+                if gene_length >= min_gene_len:
+                    if has_shine_dalgarno(
+                        shine_regex, sequence, start_position,
+                        max_shine_dalgarno_distance
+                    ):
+                        
+                        genes.append([start_position + 1, stop_position + 3])
+                        current_position = stop_position + 3 + min_gap
+
+                    else:
+                        current_position = start_position + 1
+
+                else:
+                    current_position = start_position + 1
+
+            else:
+                current_position = start_position + 1
+
+        else:
+            break
+
+    return genes
 
 
 def write_genes_pos(predicted_genes_file: Path, probable_genes: List[List[int]]) -> None:
@@ -226,11 +259,45 @@ def main() -> None: # pragma: no cover
     
     # Don't forget to uncomment !!!
     # Call these function in the order that you want
+
+    # Read the genome sequence
+    sequence = read_fasta(args.genome_file)
+
+    # Predict genes on the original strand
+    probable_genes = predict_genes(
+        sequence,
+        start_regex,
+        stop_regex,
+        shine_regex,
+        args.min_gene_len,
+        args.max_shine_dalgarno_distance,
+        args.min_gap
+    )
+
     # We reverse and complement
-    #sequence_rc = reverse_complement(sequence)
+    sequence_rc = reverse_complement(sequence)
+
+    probable_genes_comp = predict_genes(
+        sequence_rc,
+        start_regex,
+        stop_regex,
+        shine_regex,
+        args.min_gene_len,
+        args.max_shine_dalgarno_distance,
+        args.min_gap
+    )
+
+    genome_length = len(sequence)
+
+    probable_genes_comp_positions = [
+        [genome_length - end + 1, genome_length - start + 1]
+        for start, end in probable_genes_comp
+    ]
+
     # Call to output functions
-    #write_genes_pos(args.predicted_genes_file, probable_genes)
-    #write_genes(args.fasta_file, sequence, probable_genes, sequence_rc, probable_genes_comp)
+    probable_genes = sorted(probable_genes + probable_genes_comp_positions)
+    write_genes_pos(args.predicted_genes_file, probable_genes)
+    write_genes(args.fasta_file, sequence, probable_genes, sequence_rc, probable_genes_comp)
 
 
 
